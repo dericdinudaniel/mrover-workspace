@@ -277,7 +277,12 @@ private:
 
     static void cursorPosCallback(GLFWwindow* window, double xpos, double ypos);
 
+    void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
+
     // states
     double prevMouseX, prevMouseY;
     bool prevFocused = false;
+
+    //used in highlight point
+    float rgbaToFloat(uint8_t r, uint8_t g, uint8_t b, uint8_t a);
 };
