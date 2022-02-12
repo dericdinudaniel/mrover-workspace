@@ -280,6 +280,10 @@ void PointCloud::swap(PointCloud& other) {
     std::swap(pointsGPU, other.pointsGPU);
 }
 
+const std::vector<vec4> PointCloud::getPointVector() {
+    return points;
+}
+
 /*
  * Camera
  */
@@ -332,6 +336,9 @@ Viewer::Viewer()
     glfwSetScrollCallback(window, scrollCallback);
     glfwSetKeyCallback(window, keyCallback);
     glfwSetCursorPosCallback(window, cursorPosCallback);
+
+
+    glfwSetMouseButtonCallback(window, mouseButtonCallback);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -424,6 +431,104 @@ void Viewer::cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
     }
     viewer->prevFocused = focused;
 }
+
+
+
+
+// Highlights point when mouse rightclicked and displays coordinates of closest point
+void Viewer::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
+{
+    auto viewer = static_cast<Viewer*>(glfwGetWindowUserPointer(window));
+
+    if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS)
+    {
+        double xpos, ypos;
+        //getting cursor position
+        glfwGetCursorPos(window, &xpos, &ypos);
+        viewer->highlightPoint(window, xpos, ypos);
+    }
+}
+
+void Viewer::highlightPoint(GLFWwindow* window, int xpos, int ypos) {
+    std::vector<vec4> points = pointClouds[0].getPointVector();
+    std::cout << "Cursor Position at X: " << xpos << " , Y: " << ypos << std::endl;
+
+    struct DepthLess
+    {
+        public:
+        bool operator()(const std::pair<int, glm::vec4> &v1, const std::pair<int, glm::vec4> &v2)
+        {
+            return v1.second.z < v2.second.z;
+        }
+    };
+
+
+    std::vector<std::pair<int, vec4> > close_points; //stores world coords of points
+
+    int width, height;
+    glfwGetWindowSize(window, &width, &height);
+    std::cout << "Window: " << width << " " << height << std::endl;
+
+    //checks all points in point cloud (world space)
+    //note: loops by value because point modified âÂ DO NOT CHANGE TO REFERENCE
+    std::cout << "Matching screen coordinates:" << std::endl;
+    for(int i = 0; i < points.size(); i++)
+    {
+        glm::vec4 point = points[i];
+        point.w = 1; //set w to 1 (w before: rgba)
+
+        glm::vec4 clip_coords = camera.projection * camera.getView() * point;
+        //transform to clip coordinates
+
+        //normalize to NDC (-1, 1) by dividing by w
+        clip_coords.x /= clip_coords.w;
+        clip_coords.y /= clip_coords.w;
+        clip_coords.z /= clip_coords.w;
+
+        //convert NDC to screen_x, screen_y
+        float screen_x = (clip_coords.x + 1.0) * width / 2.0;
+        float screen_y = (1.0 - clip_coords.y) * height / 2.0;
+
+        float x_diff = abs(screen_x - xpos);
+        float y_diff = abs(screen_y - ypos);
+
+        float epsilon = 5.0;
+
+        if(x_diff < epsilon && y_diff < epsilon && clip_coords.z > 0)
+        {
+            // std::cout << point.x << "   " << point.y << "   " << point.z << std::endl;
+            // std::cout << screen_x << "   " << screen_y << std::endl;
+            std::pair<int, vec4> my_pair;
+            my_pair.first = i;
+            my_pair.second = point;
+            close_points.push_back(my_pair);
+        }
+    }
+
+    std::cout << "Num Matching Points: " << close_points.size() << std::endl;
+
+    DepthLess dl;
+    std::sort(close_points.begin(), close_points.end(), dl);
+
+    if(close_points.size() != 0)
+    {
+        std::cout << "**CLOSEST POINT**:  " << close_points[0].second.x << "   "
+        << close_points[0].second.y << "   " << close_points[0].second.z << "   \n" << std::endl;
+
+        points[close_points[0].first].w = rgbaToFloat(255, 0, 255, 0); //this is pink
+        pointClouds[0].update(points);
+        //pointClouds[0].draw();
+    }
+
+}
+
+float Viewer::rgbaToFloat(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+{
+    float color = (a << 24) + (r << 16) + (g << 8) + (b);
+    //std::cout << color << std::endl;
+    return color;
+}
+
 
 // Viewer tick
 void Viewer::update() {

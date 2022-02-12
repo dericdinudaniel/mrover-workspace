@@ -50,6 +50,8 @@ public:
 
     void draw();
 
+    const std::vector<vec4> getPointVector();
+
     // control p/r/y with mouse??
 //    void setRotation(float pitch, float roll, float yaw);
 
@@ -225,6 +227,9 @@ public:
 
     // need to provide thread safe ways to update viewer internals
     void updatePointCloud(int idx, vec4* pts, int size);
+
+    // Highlights a point selected by the cursor
+    void highlightPoint(GLFWwindow* window, int xpos, int ypos);
 
 #ifndef VIEWER_ONLY
 
